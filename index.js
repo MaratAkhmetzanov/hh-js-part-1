@@ -55,8 +55,8 @@ async function findRoute(fromCountry, toCountry) {
     }
 
     let requestCounter = 2;
-    const visited = [];
-    const routes = [];
+    const visited = {};
+    const routes = {};
     const stack = [...startCountry.borders];
     routes[startCountry.cca3] = [startCountry.name.common];
 
