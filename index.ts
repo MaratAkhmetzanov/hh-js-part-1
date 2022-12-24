@@ -1,8 +1,20 @@
-const API_URL = 'https://restcountries.com/v3.1';
+const API_URL: string = 'https://restcountries.com/v3.1';
 
-async function getData(url) {
+type TCountry = {
+    name: {
+        common: string;
+        official: string;
+        nativeName: { msa: { official: string; common: string } };
+    };
+    cca3: string;
+    capital: string[];
+    altSpellings: string[];
+    borders: string[];
+};
+
+async function getData(url: string): Promise<any> {
     // https://developer.mozilla.org/en-US/docs/Web/API/Fetch_API/Using_Fetch
-    const response = await fetch(url, {
+    const response: Response = await fetch(url, {
         method: 'GET',
         headers: {
             'Content-Type': 'application/json',
@@ -13,56 +25,53 @@ async function getData(url) {
 }
 
 async function loadCountriesData() {
-    const countries = await getData(`${API_URL}/all?fields=name&fields=cca3&fields=area`);
-    return countries.reduce((result, country) => {
+    const countries: Array<TCountry> = await getData(`${API_URL}/all?fields=name&fields=cca3&fields=area`);
+    return countries.reduce((result: { [keys in string]: TCountry }, country: TCountry) => {
         result[country.cca3] = country;
         return result;
     }, {});
 }
 
-async function getCodeByName(name) {
-    const result = await getData(`${API_URL}/name/${name}?fullText=true&fields=cca3&fields=borders&fields=name`);
-    return result.status ? result : result[0];
+async function getCodeByName(name: string): Promise<TCountry> {
+    return await getData(`${API_URL}/name/${name}?fullText=true&fields=cca3&fields=borders&fields=name`).then((res) =>
+        !res.status ? res[0] : Promise.reject(res)
+    );
 }
 
-async function getBordersByCode(code) {
+async function getBordersByCode(code: string | undefined) {
     if (code === 'BRN') {
-        const result = await getData(`${API_URL}/name/Brunei?fullText=true&fields=cca3&fields=borders&fields=name`);
+        const result: Array<TCountry> = await getData(
+            `${API_URL}/name/Brunei?fullText=true&fields=cca3&fields=borders&fields=name`
+        );
         return result[0];
     }
-    const result = await getData(`${API_URL}/alpha/${code}?fields=cca3&fields=borders&fields=name`);
+    const result: TCountry = await getData(`${API_URL}/alpha/${code}?fields=cca3&fields=borders&fields=name`);
     return result;
 }
 
-async function findRoute(fromCountry, toCountry) {
-    const errorResult = (message) =>
+async function findRoute(fromCountry: string, toCountry: string) {
+    const errorResult = (message: string) =>
         Promise.reject({
             status: 'error',
             message,
         });
 
-    const startCountry = await getCodeByName(fromCountry);
-    const endCountry = await getCodeByName(toCountry);
+    const startCountry: TCountry = await getCodeByName(fromCountry);
+    const endCountry: TCountry = await getCodeByName(toCountry);
 
-    if (startCountry.status) {
-        return errorResult('Unable to calculate route. Cannot find "from" country');
-    }
-    if (endCountry.status) {
-        return errorResult('Unable to calculate route. Cannot find "to" country');
-    }
     if (!startCountry.borders.length || !endCountry.borders.length) {
         return errorResult('No ground route between countries');
     }
 
-    let requestCounter = 2;
-    const visited = {};
-    const routes = {};
-    const stack = [...startCountry.borders];
+    let requestCounter: number = 2;
+    const visited: { [key: string]: number } = {};
+    const routes: { [key: string]: string[] } = {};
+    const stack: Array<string> = [...startCountry.borders];
     routes[startCountry.cca3] = [startCountry.name.common];
 
     while (stack.length) {
         // eslint-disable-next-line no-await-in-loop
-        const country = await getBordersByCode(stack.shift());
+        const country: TCountry = await getBordersByCode(stack.shift());
         requestCounter += 1;
         visited[country.cca3] = 1;
         let minDestination = Infinity;
@@ -92,12 +101,12 @@ async function findRoute(fromCountry, toCountry) {
     return errorResult('No ground route between countries');
 }
 
-const form = document.getElementById('form');
-const fromCountry = document.getElementById('fromCountry');
-const toCountry = document.getElementById('toCountry');
-const countriesList = document.getElementById('countriesList');
-const submit = document.getElementById('submit');
-const output = document.getElementById('output');
+const form = document.getElementById('form') as HTMLFormElement;
+const fromCountry = document.getElementById('fromCountry') as HTMLInputElement;
+const toCountry = document.getElementById('toCountry') as HTMLInputElement;
+const countriesList = document.getElementById('countriesList') as HTMLDataListElement;
+const submit = document.getElementById('submit') as HTMLButtonElement;
+const output = document.getElementById('output') as HTMLDivElement;
 
 (async () => {
     fromCountry.disabled = true;

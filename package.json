@@ -1,11 +1,12 @@
 {
   "name": "js-part-1",
   "version": "1.0.0",
-  "main": "index.js",
+  "main": "index.ts",
   "repository": "git@github.com:ipetropolsky/js-part-1.git",
   "author": "'Ivan Petropolsky' <i.petropolsky@hh.ru>",
   "license": "MIT",
   "scripts": {
+    "build": "tsc --outDir ./build",
     "postinstall": "cp ./githooks/* .git/hooks",
     "lint-staged": "lint-staged",
     "http-server": "http-server"
@@ -17,5 +18,8 @@
     "http-server": "14.1.1",
     "lint-staged": "13.1.0",
     "prettier": "2.8.0"
+  },
+  "dependencies": {
+    "typescript": "4.9.4"
   }
 }

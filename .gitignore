@@ -26,6 +26,7 @@ Desktop.ini
 .cov2emacs.log
 .coverage
 
+build
 node_modules
 yarn-error.log
 npm-debug.log
