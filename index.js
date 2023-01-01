@@ -40,6 +40,7 @@ function getData(url) {
     );
 }
 
+// Загрузка списка стран с сервера
 async function loadCountriesData() {
     let countries = [];
     try {
@@ -57,76 +58,90 @@ async function loadCountriesData() {
     }, {});
 }
 
-async function getCodeByName(name) {
-    const result = await getData(`${API_URL}/name/${name}?fullText=true&fields=cca3&fields=borders&fields=name`);
-    return result.status ? result : result[0];
+/**
+ * Поиск кода страны в списке загруженных стран, так как из инпута достаётся название страны, а не код.
+ * @param {String} name - название страны
+ * @param {Object} countriesData - список загруженных стран
+ * @returns String - код страны
+ */
+function getCodeByName(name, countriesData) {
+    return Object.keys(countriesData).find((code) => countriesData[code].name.common === name);
 }
 
+/**
+ * Получения списка кодов граничащих стран.
+ * @param {String} code - код страны, по которой нужен список кодов
+ * @returns - список кодов в виде массива
+ */
 async function getBordersByCode(code) {
-    if (code === 'BRN') {
-        const result = await getData(`${API_URL}/name/Brunei?fullText=true&fields=cca3&fields=borders&fields=name`);
-        return result[0];
-    }
     const result = await getData(`${API_URL}/alpha/${code}?fields=cca3&fields=borders&fields=name`);
     return result;
 }
 
+/**
+ * Функция поиска минимального маршрута между двумя странами через поиск в ширину.
+ * @param {String} fromCountry - код начальной страны
+ * @param {String} toCountry - код страны назначения
+ * @returns - количество запросов на сервер и кратчайший маршрут между странами в виде массива
+ */
 async function findRoute(fromCountry, toCountry) {
-    const errorResult = (message) =>
-        Promise.reject({
-            status: 'error',
-            message,
-        });
+    try {
+        // Получаем границы по начальной и конечной странам
+        const [startCountry, endCountry] = await Promise.all([
+            getBordersByCode(fromCountry),
+            getBordersByCode(toCountry),
+        ]);
 
-    const startCountry = await getCodeByName(fromCountry);
-    const endCountry = await getCodeByName(toCountry);
+        if (startCountry.status === 400) {
+            throw new Error('Unable to calculate route. Cannot find "from" country');
+        }
+        if (endCountry.status === 400) {
+            throw new Error('Unable to calculate route. Cannot find "to" country');
+        }
+        if (!startCountry.borders.length || !endCountry.borders.length) {
+            throw new Error('No ground route between countries');
+        }
 
-    if (startCountry.status) {
-        return errorResult('Unable to calculate route. Cannot find "from" country');
-    }
-    if (endCountry.status) {
-        return errorResult('Unable to calculate route. Cannot find "to" country');
-    }
-    if (!startCountry.borders.length || !endCountry.borders.length) {
-        return errorResult('No ground route between countries');
-    }
+        let requestCounter = 2; // Счетчик количества запросов, с учетом запросов по startCountry и endCountry
+        const visited = {}; // Список посещенных стран. Чтобы не обрабатывать уже посещенные страны
+        const routes = {}; // Список кратчайших маршрутов между странами.
+        const stack = [...startCountry.borders]; // Стек для последовательного прохождения по списку граничащих стран
 
-    let requestCounter = 2;
-    const visited = {};
-    const routes = {};
-    const stack = [...startCountry.borders];
-    routes[startCountry.cca3] = [startCountry.name.common];
+        routes[startCountry.cca3] = [startCountry.name.common];
 
-    while (stack.length) {
-        // eslint-disable-next-line no-await-in-loop
-        const country = await getBordersByCode(stack.shift());
-        requestCounter += 1;
-        visited[country.cca3] = 1;
-        let minDestination = Infinity;
+        while (stack.length) {
+            // eslint-disable-next-line no-await-in-loop
+            const country = await getBordersByCode(stack.shift());
+            requestCounter += 1;
+            visited[country.cca3] = true;
+            let minDestination = Infinity;
 
-        country.borders.forEach((element) => {
-            if (!stack.includes(element) && !visited[element]) {
-                stack.push(element);
-            }
-            if (routes[element] && minDestination >= routes[element].length) {
-                routes[country.cca3] = [...routes[element], country.name.common];
-                minDestination = routes[element].length;
-            }
-        });
-
-        if (country.borders.includes(endCountry.cca3)) {
-            minDestination = Infinity;
-
-            endCountry.borders.forEach((element) => {
+            country.borders.forEach((element) => {
+                if (!stack.includes(element) && !visited[element]) {
+                    stack.push(element);
+                }
                 if (routes[element] && minDestination >= routes[element].length) {
-                    routes[endCountry.cca3] = [...routes[element], endCountry.name.common];
+                    routes[country.cca3] = [...routes[element], country.name.common];
                     minDestination = routes[element].length;
                 }
             });
-            return { status: 'ok', requestCount: requestCounter, route: routes[endCountry.cca3] };
+
+            if (country.borders.includes(endCountry.cca3)) {
+                minDestination = Infinity;
+
+                endCountry.borders.forEach((element) => {
+                    if (routes[element] && minDestination >= routes[element].length) {
+                        routes[endCountry.cca3] = [...routes[element], endCountry.name.common];
+                        minDestination = routes[element].length;
+                    }
+                });
+                return { requestCount: requestCounter, route: routes[endCountry.cca3] };
+            }
         }
+        throw new Error('No ground route between countries');
+    } catch (error) {
+        throw new Error(error);
     }
-    return errorResult('No ground route between countries');
 }
 
 const form = document.getElementById('form');
@@ -180,19 +195,20 @@ const output = document.getElementById('output');
 
     form.addEventListener('submit', (event) => {
         event.preventDefault();
-        if (fromCountry.value && toCountry.value) {
+        if (!fromCountry.value || !toCountry.value) {
+            output.textContent = 'Please, select both countries';
+        } else {
             fromCountry.disabled = true;
             toCountry.disabled = true;
             submit.disabled = true;
+
             output.textContent = `Calculating path from ${fromCountry.value} to ${toCountry.value} …`;
 
-            findRoute(fromCountry.value, toCountry.value)
+            findRoute(getCodeByName(fromCountry.value, countriesData), getCodeByName(toCountry.value, countriesData))
                 .then((res) => {
-                    if (res.status === 'ok' && res.route.length) {
-                        output.innerHTML = `Request count: ${res.requestCount} <br />`;
-                        output.innerHTML += `Countries in route: ${res.route.length} <br />`;
-                        output.innerHTML += `Route: ${res.route.join(' → ')}`;
-                    }
+                    output.innerHTML = `Request count: ${res.requestCount} <br />`;
+                    output.innerHTML += `Countries in route: ${res.route.length} <br />`;
+                    output.innerHTML += `Route: ${res.route.join(' → ')}`;
                 })
                 .catch((error) => {
                     if (error.message) {
@@ -206,8 +222,6 @@ const output = document.getElementById('output');
                     toCountry.disabled = false;
                     submit.disabled = false;
                 });
-        } else {
-            output.textContent = 'Please, select both countries';
         }
     });
 })();
