@@ -23,7 +23,7 @@ am5.ready(() => {
     mapNode.id = 'maps';
     mapNode.style.height = '500px';
     mapNode.style.marginTop = '20px';
-    document.querySelector('#output').parentNode.appendChild(mapNode);
+    document.querySelector('#map-output').parentNode.appendChild(mapNode);
 
     const root = am5.Root.new('maps');
 

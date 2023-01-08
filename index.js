@@ -1,3 +1,5 @@
+import Maps from '/maps.js';
+
 const API_URL = 'https://restcountries.com/v3.1';
 
 // Загрузка данных через промисы
@@ -86,6 +88,7 @@ async function getBordersByCode(code) {
  */
 async function findRoute(fromCountry, toCountry) {
     try {
+        Maps.setEndPoints(fromCountry, toCountry);
         // Получаем границы по начальной и конечной странам
         const [startCountry, endCountry] = await Promise.all([
             getBordersByCode(fromCountry),
@@ -114,6 +117,7 @@ async function findRoute(fromCountry, toCountry) {
             const country = await getBordersByCode(stack.shift());
             requestCounter += 1;
             visited[country.cca3] = true;
+            Maps.markAsVisited([country.cca3]);
             let minDestination = Infinity;
 
             country.borders.forEach((element) => {
