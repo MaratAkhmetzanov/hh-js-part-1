@@ -1,6 +1,13 @@
 import Maps from '/maps.js';
 
 const API_URL = 'https://restcountries.com/v3.1';
+const form = document.getElementById('form');
+const fromCountry = document.getElementById('fromCountry');
+const toCountry = document.getElementById('toCountry');
+const countriesList = document.getElementById('countriesList');
+const submit = document.getElementById('submit');
+const output = document.getElementById('output');
+let countriesData = {};
 
 // Загрузка данных через промисы
 function getData(url) {
@@ -13,30 +20,15 @@ function getData(url) {
         redirect: 'follow',
     }).then(
         (response) => {
-            // Если мы тут, значит, запрос выполнился.
-            // Но там может быть 404, 500, и т.д., поэтому проверяем ответ.
             if (response.ok) {
                 return response.json();
             }
-            // Пример кастомной ошибки (если нужно проставить какие-то поля
-            // для внешнего кода). Можно зареджектить и сам `response`, смотря
-            // какой у вас контракт. Главное перевести код в ветку `catch`.
             return Promise.reject({
                 status: response.status,
                 customError: 'wtfPromise',
             });
         },
-
-        // При сетевой ошибке (мы оффлайн) из fetch вылетит эксцепшн,
-        // и мы попадём в `onRejected` или в `.catch()` на промисе.
-        // Если не добавить `onRejected` или `catch`, при ошибке будет
-        // эксцепшн `Uncaught (in promise)`.
         (error) => {
-            // Если не вернуть `Promise.reject()`, для внешнего кода
-            // промис будет зарезолвлен с `undefined`, и мы не попадём
-            // в ветку `catch` для обработки ошибок, а скорее всего
-            // получим другой эксцепшн, потому что у нас `undefined`
-            // вместо данных, с которыми мы работаем.
             return Promise.reject(error);
         }
     );
@@ -46,12 +38,10 @@ function getData(url) {
 async function loadCountriesData() {
     let countries = [];
     try {
-        // ПРОВЕРКА ОШИБКИ №1: ломаем этот урл, заменяя all на allolo,
-        // получаем кастомную ошибку.
-        countries = await getData('https://restcountries.com/v3.1/all?fields=name&fields=cca3&fields=area');
+        countries = await getData(
+            'https://restcountries.com/v3.1/all?fields=name&fields=cca3&fields=area&fields=borders'
+        );
     } catch (error) {
-        // console.log('catch for getData');
-        // console.error(error);
         throw error;
     }
     return countries.reduce((result, country) => {
@@ -63,10 +53,9 @@ async function loadCountriesData() {
 /**
  * Поиск кода страны в списке загруженных стран, так как из инпута достаётся название страны, а не код.
  * @param {String} name - название страны
- * @param {Object} countriesData - список загруженных стран
  * @returns String - код страны
  */
-function getCodeByName(name, countriesData) {
+function getCodeByName(name) {
     return Object.keys(countriesData).find((code) => countriesData[code].name.common === name);
 }
 
@@ -80,6 +69,10 @@ async function getBordersByCode(code) {
     return result;
 }
 
+async function getBordersByCodeInternal(code) {
+    return countriesData[code];
+}
+
 /**
  * Функция поиска минимального маршрута между двумя странами через поиск в ширину.
  * @param {String} fromCountry - код начальной страны
@@ -91,8 +84,8 @@ async function findRoute(fromCountry, toCountry) {
         Maps.setEndPoints(fromCountry, toCountry);
         // Получаем границы по начальной и конечной странам
         const [startCountry, endCountry] = await Promise.all([
-            getBordersByCode(fromCountry),
-            getBordersByCode(toCountry),
+            getBordersByCodeInternal(fromCountry),
+            getBordersByCodeInternal(toCountry),
         ]);
 
         if (startCountry.status === 400) {
@@ -148,27 +141,15 @@ async function findRoute(fromCountry, toCountry) {
     }
 }
 
-const form = document.getElementById('form');
-const fromCountry = document.getElementById('fromCountry');
-const toCountry = document.getElementById('toCountry');
-const countriesList = document.getElementById('countriesList');
-const submit = document.getElementById('submit');
-const output = document.getElementById('output');
-
 (async () => {
     fromCountry.disabled = true;
     toCountry.disabled = true;
     submit.disabled = true;
 
     output.textContent = 'Loading…';
-    let countriesData = {};
     try {
-        // ПРОВЕРКА ОШИБКИ №2: Ставим тут брейкпоинт и, когда дойдёт
-        // до него, переходим в оффлайн-режим. Получаем эксцепшн из `fetch`.
         countriesData = await loadCountriesData();
     } catch (error) {
-        // console.log('catch for loadCountriesData');
-        // console.error(error);
         output.textContent = 'Something went wrong. Try to reset your compluter.';
         return;
     }
@@ -208,7 +189,7 @@ const output = document.getElementById('output');
 
             output.textContent = `Calculating path from ${fromCountry.value} to ${toCountry.value} …`;
 
-            findRoute(getCodeByName(fromCountry.value, countriesData), getCodeByName(toCountry.value, countriesData))
+            findRoute(getCodeByName(fromCountry.value), getCodeByName(toCountry.value))
                 .then((res) => {
                     output.innerHTML = `Request count: ${res.requestCount} <br />`;
                     output.innerHTML += `Countries in route: ${res.route.length} <br />`;
