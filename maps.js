@@ -21,9 +21,9 @@ am5.ready(() => {
     // и всё такое прочее должно решать приложение, а не модуль карты.
     const mapNode = document.createElement('div');
     mapNode.id = 'maps';
-    mapNode.style.height = '500px';
+    mapNode.style.height = '400px';
     mapNode.style.marginTop = '20px';
-    document.querySelector('#map-output').parentNode.appendChild(mapNode);
+    document.querySelector('#output').parentNode.appendChild(mapNode);
 
     const root = am5.Root.new('maps');
 

@@ -1,6 +1,26 @@
 body {
     padding-top: 2em;
 }
+
+#form {
+    margin: 0;
+}
+
 .mui-btn {
     transition: none;
+}
+
+.mui-textfield {
+    flex-grow: 1;
+}
+
+.form__layout {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+#maps {
+    border: 1px solid #dfdfdf;
+    border-radius: 12px;
 }
