@@ -1,6 +1,5 @@
 import Maps from '/maps.js';
 
-const API_URL = 'https://restcountries.com/v3.1';
 const form = document.getElementById('form');
 const fromCountry = document.getElementById('fromCountry');
 const toCountry = document.getElementById('toCountry');
@@ -64,13 +63,8 @@ function getCodeByName(name) {
  * @param {String} code - код страны, по которой нужен список кодов
  * @returns - список кодов в виде массива
  */
-async function getBordersByCode(code) {
-    const result = await getData(`${API_URL}/alpha/${code}?fields=cca3&fields=borders&fields=name`);
-    return result;
-}
-
 async function getBordersByCodeInternal(code) {
-    return countriesData[code];
+    return countriesData[code].borders;
 }
 
 /**
@@ -107,7 +101,7 @@ async function findRoute(fromCountry, toCountry) {
 
         while (stack.length) {
             // eslint-disable-next-line no-await-in-loop
-            const country = await getBordersByCode(stack.shift());
+            const country = await getBordersByCodeInternal(stack.shift());
             requestCounter += 1;
             visited[country.cca3] = true;
             Maps.markAsVisited([country.cca3]);
